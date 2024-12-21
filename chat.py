@@ -3,6 +3,7 @@ import threading
 import sys
 from colorama import init, Fore, Style
 import time
+import os
 
 # Initialize colorama
 init()
@@ -12,8 +13,11 @@ class ChatApp:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.is_host = False
         self.connected = False
+        self.username = ""
+        self.peer_username = "CONNECTED USER"
 
     def start_chat(self):
+        self.username = input("Please enter your name: ")
         choice = input("Do you want to (1) host or (2) connect? Enter 1 or 2: ")
         
         if choice == "1":
@@ -36,7 +40,11 @@ class ChatApp:
         # Accept connection
         self.connection, self.client_address = self.sock.accept()
         self.connected = True
-        print(f"\nConnected to {self.client_address[0]}")
+        
+        # Exchange usernames
+        self.connection.send(self.username.encode())
+        self.peer_username = self.connection.recv(1024).decode()
+        print(f"\nConnected to {self.client_address[0]} ({self.peer_username})")
         
         # Start message threads
         self.start_message_threads()
@@ -47,7 +55,11 @@ class ChatApp:
             self.sock.connect((host_ip, 12345))
             self.connection = self.sock
             self.connected = True
-            print(f"\nConnected to {host_ip}")
+            
+            # Exchange usernames
+            self.peer_username = self.connection.recv(1024).decode()
+            self.connection.send(self.username.encode())
+            print(f"\nConnected to {host_ip} ({self.peer_username})")
             
             # Start message threads
             self.start_message_threads()
@@ -56,6 +68,10 @@ class ChatApp:
             sys.exit()
 
     def start_message_threads(self):
+        # Clear screen before starting chat
+        os.system('cls' if os.name == 'nt' else 'clear')
+        print(f"\nChat started! You are chatting as {self.username} with {self.peer_username}")
+        
         # Start receiving thread
         receive_thread = threading.Thread(target=self.receive_messages)
         receive_thread.daemon = True
@@ -81,9 +97,9 @@ class ChatApp:
                 if not data:
                     break
                     
-                # Print received message in green
-                print(f"\r{Fore.GREEN}{data.decode()}{Style.RESET_ALL}")
-                print(f"{Fore.BLUE}You: {Style.RESET_ALL}", end='', flush=True)
+                # Print received message with peer's username
+                print(f"\r{Fore.GREEN}{self.peer_username}: {data.decode()}{Style.RESET_ALL}")
+                print(f"{Fore.BLUE}{self.username}: {Style.RESET_ALL}", end='', flush=True)
                 
             except:
                 self.connected = False
@@ -95,7 +111,7 @@ class ChatApp:
     def send_messages(self):
         while self.connected:
             try:
-                message = input(f"{Fore.BLUE}You: {Style.RESET_ALL}")
+                message = input(f"{Fore.BLUE}{self.username}: {Style.RESET_ALL}")
                 if not message:
                     continue
                     
@@ -108,9 +124,19 @@ class ChatApp:
                 self.connected = False
                 break
 
+    @staticmethod
+    def print_title():
+        print("""   ____            _ _        _____ _           _     _____                        
+             / ____| |         | |   |  __ \\                       
+            | |    | |__   __ _| |_  | |__) |___   ___  _ __ ___   
+            | |    | '_ \\ / _` | __| |  _  // _ \\ / _ \\| '_ ` _ \\  
+             \\ | |____| | | | (_| | |_  | | \\ \\ (_) | (_) | | | | | | 
+              \\_____|_| |_|\\__,_|\\__| |_|  \\_\\___/ \\___/|_| |_| |_| 
+        """)
+
 if __name__ == "__main__":
-    print("Osal & Talia's Personal Chat Space ")
-    print("==========================")
+    
     
     chat = ChatApp()
+    ChatApp.print_title()
     chat.start_chat()
